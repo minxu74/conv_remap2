@@ -1,4 +1,4 @@
-# Conservative Remapping the outputs of land models
+# Conservatively Remapping the outputs of land models
 
 ## Introduction
 
