@@ -29,6 +29,15 @@ else
    exit -1
 fi
 
+#mxu check ncremap if sgs options
+out_ncremap="$($ncobdir/ncremap)"
+
+if [[ $out_ncremap == *"sgs"* ]]; then
+   useold=1
+else
+   useold=0
+fi
+
 # source and targe grid description in SCRIP format
 s="SCRIPgrid_ne30np4_nomask_c101123.nc"
 d="SCRIPgrid_fv09_nomask_c101123.nc"
@@ -135,7 +144,7 @@ fi
 # --- core part ---
 i=0
 
-for f in ${Infiles}
+for f in "${Infiles[@]}"
 do
    echo "remapping $f"
 
@@ -256,7 +265,12 @@ EOF
    fi   # finish generating the masked destination grid description file
 
    #do ncremap again, but using land area instead of grid area
-   $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas' -o test.nc  -m map.nc
+
+   if [[ $useold == 1 ]]; then 
+       $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas' -o test.nc  -m map.nc
+   else
+       $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -W '--user_areas' -o test.nc  -m map.nc
+   fi
    
    $ncobdir/ncks -O -x -v area,landmask,landfrac test.nc $dst_dir/$fo
    $ncobdir/ncks -O -v area,landmask,landfrac z.nc w.nc
