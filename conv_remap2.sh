@@ -13,6 +13,8 @@ if [ $? = 1 ]; then
    exit -1
 fi
 
+
+
 esmftes=$(which ESMF_RegridWeightGen 2>&1)
 if [ $? = 1 ]; then
    echo ESMF_RegridWeightGen is required for runing $(basename $0)
@@ -29,13 +31,30 @@ else
    exit -1
 fi
 
+ncaptest=$(which ncap 2>&1)
+if [ $? = 0 ]; then
+   ncapbin=$ncobdir/ncap
+else
+   ncaptest=$(which ncap2 2>&1)
+   if [ $? = 0 ]; then
+      ncapbin=$ncobdir/ncap2
+   fi
+fi
+
+if [ -z ${ncapbin+x} ]; then
+   echo ncap2 and ncap are needed in $(basename $0)
+fi
+
+echo $ncapbin
+
+
 #mxu check ncremap if sgs options
 out_ncremap="$($ncobdir/ncremap)"
 
 if [[ $out_ncremap == *"sgs"* ]]; then
-   useold=1
-else
    useold=0
+else
+   useold=1
 fi
 
 # source and targe grid description in SCRIP format
@@ -178,7 +197,7 @@ cat <<EOF >./tmp1.nco
   area=grid_area;
 EOF
       #the area is gridcell area
-      $ncobdir/ncap2 -O -v -S tmp1.nco $s -o b.nc
+      $ncapbin -O -v -S tmp1.nco $s -o b.nc
       /bin/rm -f tmp1.nco
       
       #combine the area and landfrac variables
@@ -200,7 +219,7 @@ cat <<EOF >./tmp2.nco
 EOF
    
       #get grid_area and grid_imask for source SCRIP grid by the land area
-      $ncobdir/ncap2 -O -S tmp2.nco b.nc -o g_src.nc
+      $ncapbin -O -S tmp2.nco b.nc -o g_src.nc
       /bin/rm -f b.nc
       /bin/rm -f tmp2.nco
       
@@ -229,7 +248,7 @@ cat <<EOF >./tmp3.nco
    where(grid_area>0) landmask=1;
    elsewhere          landmask=0;
 EOF
-      $ncobdir/ncap2 -O -S tmp3.nco g_dst.nc z.nc
+      $ncapbin -O -S tmp3.nco g_dst.nc z.nc
       /bin/rm -f tmp3.nco
       $ncobdir/ncks -O -v grid_area z.nc y.nc
       $ncobdir/ncatted -a units,grid_area,o,c,'radians^2' y.nc
@@ -238,7 +257,7 @@ EOF
 cat <<EOF >./tmp4.nco
     grid_area=grid_center_lat*0.0; 
 EOF
-      $ncobdir/ncap2 -O -S tmp4.nco $d $dm
+      $ncapbin -O -S tmp4.nco $d $dm
 
       /bin/rm -f tmp4.nco
 
@@ -267,9 +286,17 @@ EOF
    #do ncremap again, but using land area instead of grid area
 
    if [[ $useold == 1 ]]; then 
-       $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas' -o test.nc  -m map.nc
+       if [ "$i" = "1" ]; then
+          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas' -o test.nc -m map.nc
+       else
+          $ncobdir/ncremap -i $f -o test.nc -m map.nc
+       fi
    else
-       $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -W '--user_areas' -o test.nc  -m map.nc
+       if [ "$i" = "1" ]; then
+          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -W '--user_areas' -o test.nc -m map.nc
+       else
+          $ncobdir/ncremap -i $f -o test.nc -m map.nc
+       fi
    fi
    
    $ncobdir/ncks -O -x -v area,landmask,landfrac test.nc $dst_dir/$fo
@@ -284,4 +311,5 @@ done
 #clean up
 /bin/rm -f test.nc
 /bin/rm -f z.nc
+/bin/rm -f g_dst.nc
 exit 0
