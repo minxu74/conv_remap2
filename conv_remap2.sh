@@ -6,6 +6,7 @@
 
 # Contact: minxu@climatemodeling.org
 
+
 #get binary directory of nco
 ncotest=$(which ncremap 2>&1)
 if [ $? = 1 ]; then
@@ -31,15 +32,17 @@ else
    exit -1
 fi
 
-ncaptest=$(which ncap 2>&1)
-if [ $? = 0 ]; then
-   ncapbin=$ncobdir/ncap
-else
-   ncaptest=$(which ncap2 2>&1)
-   if [ $? = 0 ]; then
-      ncapbin=$ncobdir/ncap2
-   fi
-fi
+#ncaptest=$(which ncap 2>&1)
+#if [ $? = 0 ]; then
+#   ncapbin=$ncobdir/ncap
+#else
+#   ncaptest=$(which ncap2 2>&1)
+#   if [ $? = 0 ]; then
+#      ncapbin=$ncobdir/ncap2
+#   fi
+#fi
+
+ncapbin=$ncobdir/ncap2
 
 if [ -z ${ncapbin+x} ]; then
    echo ncap2 and ncap are needed in $(basename $0)
@@ -220,6 +223,7 @@ EOF
    
       #get grid_area and grid_imask for source SCRIP grid by the land area
       $ncapbin -O -S tmp2.nco b.nc -o g_src.nc
+
       /bin/rm -f b.nc
       /bin/rm -f tmp2.nco
       
@@ -238,6 +242,7 @@ EOF
       
       #remap the landfrac data from src to dst grid using the entire grid area and without any masks. 
       $ncobdir/ncremap -i g_src.nc -s $s -g $d -a conserve -o g_dst.nc
+
 
       /bin/rm -f g_src.nc
       
@@ -287,16 +292,18 @@ EOF
 
    if [[ $useold == 1 ]]; then 
        if [ "$i" = "1" ]; then
-          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas' -o test.nc -m map.nc
+          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas -i' -o test.nc -m map.nc
        else
           $ncobdir/ncremap -i $f -o test.nc -m map.nc
        fi
    else
        if [ "$i" = "1" ]; then
-          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -W '--user_areas' -o test.nc -m map.nc
+          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -W '--user_areas -i' -o test.nc -m map.nc
        else
           $ncobdir/ncremap -i $f -o test.nc -m map.nc
        fi
+
+       exit
    fi
    
    $ncobdir/ncks -O -x -v area,landmask,landfrac test.nc $dst_dir/$fo
