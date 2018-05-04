@@ -17,6 +17,7 @@ fi
 
 
 esmftes=$(which ESMF_RegridWeightGen 2>&1)
+
 if [ $? = 1 ]; then
    echo ESMF_RegridWeightGen is required for runing $(basename $0)
    exit -1
@@ -192,7 +193,8 @@ do
 
       $ncobdir/ncks -O -v landfrac $f a.nc
       $ncobdir/ncrename -O -d lndgrid,grid_size a.nc
-   
+
+
    #extract lat/lon and area from source SCRIP grid file
 cat <<EOF >./tmp1.nco
   lat=grid_center_lat;
@@ -290,22 +292,29 @@ EOF
 
    #do ncremap again, but using land area instead of grid area
 
+
    if [[ $useold == 1 ]]; then 
+      export NCO_PATH_OVERRIDE='No' 
+      $ncobdir/ncrename -O -d gridcell,gridxxxx $f  -o xxx.nc
        if [ "$i" = "1" ]; then
-          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -E '--user_areas -i' -o test.nc -m map.nc
+          $ncobdir/ncremap -i xxx.nc -s $sm -g $dm -a conserve -E '--user_areas -i' -o test.nc -m map.nc
        else
-          $ncobdir/ncremap -i $f -o test.nc -m map.nc
+          $ncobdir/ncremap -i xxx.nc -o test.nc -m map.nc
        fi
    else
+      # make the new nco version work
+      # turn off path hardcoded in ncremap, especially the 'modele load ncl'
+      # will load ncl/6.1.0 and ESMF_RegridWeightGen's version is less than 6.3.0
+      export NCO_PATH_OVERRIDE='No' 
+      $ncobdir/ncrename -O -d gridcell,gridxxxx $f  -o xxx.nc
        if [ "$i" = "1" ]; then
-          $ncobdir/ncremap -i $f -s $sm -g $dm -a conserve -W '--user_areas -i' -o test.nc -m map.nc
+          $ncobdir/ncremap -i xxx.nc -s $sm -g $dm -a conserve -W '--user_areas -i' -o test.nc -m map.nc
        else
-          $ncobdir/ncremap -i $f -o test.nc -m map.nc
+          $ncobdir/ncremap -i xxx.nc -o test.nc -m map.nc
        fi
-
-       exit
+       /bin/rm -f xxx.nc
    fi
-   
+
    $ncobdir/ncks -O -x -v area,landmask,landfrac test.nc $dst_dir/$fo
    $ncobdir/ncks -O -v area,landmask,landfrac z.nc w.nc
    $ncobdir/ncks -A w.nc $dst_dir/$fo 
