@@ -295,7 +295,7 @@ EOF
 
    if [[ $useold == 1 ]]; then 
       export NCO_PATH_OVERRIDE='No' 
-      $ncobdir/ncrename -O -d gridcell,gridxxxx $f  -o xxx.nc
+      $ncobdir/ncrename -O -d .gridcell,gridxxxx $f  -o xxx.nc
        if [ "$i" = "1" ]; then
           $ncobdir/ncremap -i xxx.nc -s $sm -g $dm -a conserve -E '--user_areas -i' -o test.nc -m map.nc
        else
@@ -306,7 +306,7 @@ EOF
       # turn off path hardcoded in ncremap, especially the 'modele load ncl'
       # will load ncl/6.1.0 and ESMF_RegridWeightGen's version is less than 6.3.0
       export NCO_PATH_OVERRIDE='No' 
-      $ncobdir/ncrename -O -d gridcell,gridxxxx $f  -o xxx.nc
+      $ncobdir/ncrename -O -d .gridcell,gridxxxx $f  -o xxx.nc
        if [ "$i" = "1" ]; then
           $ncobdir/ncremap -i xxx.nc -s $sm -g $dm -a conserve -W '--user_areas -i' -o test.nc -m map.nc
        else
