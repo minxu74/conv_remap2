@@ -7,6 +7,11 @@
 # Contact: minxu@climatemodeling.org
 
 
+#nco functions copy from nco users' guide
+      export NCO_PATH_OVERRIDE='No' 
+
+function ncdmnlst { ncks --cdl -m ${1} | cut -d ':' -f 1 | cut -d '=' -s -f 1 ; }
+
 #get binary directory of nco
 ncotest=$(which ncremap 2>&1)
 if [ $? = 1 ]; then
@@ -190,9 +195,19 @@ do
       #extract landfrac from data, we do not use the area variable in the data file, because 
       #its values are _FillValue over ocean. Instead we use the area variable from the source 
       #SCRIP grid file. They should be exactly same, except the units
-
       $ncobdir/ncks -O -v landfrac $f a.nc
-      $ncobdir/ncrename -O -d lndgrid,grid_size a.nc
+
+
+      #-dimenions=`ncdmnlst $f`
+
+      #-if [[ $dimension == *"lndgrid"* ]];
+      #-   $ncobdir/ncrename -O -d lndgrid,grid_size a.nc
+      #-else
+      #-   $ncobdir/ncrename -O -d lndgrid,grid_size a.nc
+
+      #-fi
+      #-exit
+
 
 
    #extract lat/lon and area from source SCRIP grid file
@@ -213,18 +228,22 @@ EOF
       $ncobdir/ncatted -a    _FillValue,landfrac,d,, b.nc
       $ncobdir/ncatted -a missing_value,landfrac,d,, b.nc
 
+
       #test
       #$ncobdir/ncks -O -v landfrac,area,
 cat <<EOF >./tmp2.nco
    where(landfrac > 1) landfrac=0.0;
-   grid_area=landfrac*area;
+   grid_area=area;
+   grid_area=landfrac;
+   grid_area=grid_area*area;
    grid_imask=int(grid_area)*0;
-   where(landfrac > 0) grid_imask=1;
-   elsewhere           grid_imask=0;
+   where(grid_area > 0) grid_imask=1;
+   elsewhere            grid_imask=0;
 EOF
    
       #get grid_area and grid_imask for source SCRIP grid by the land area
       $ncapbin -O -S tmp2.nco b.nc -o g_src.nc
+
 
       /bin/rm -f b.nc
       /bin/rm -f tmp2.nco
@@ -237,8 +256,10 @@ EOF
       $ncobdir/ncatted -a units,grid_area,o,c,'radians^2' $sm 
       $ncobdir/ncatted -a long_name,grid_area,o,c,'area weights' $sm 
       $ncobdir/ncatted -a units,grid_imask,o,c,'unitless' $sm
-      
-      
+
+      $ncobdir/ncks -O -v landfrac g_src.nc b.nc
+      /bin/mv -f b.nc g_src.nc
+
       #ncremap can only recognize the dimension name as lndgrid etc.
       $ncobdir/ncrename -O -d grid_size,lndgrid g_src.nc
       
@@ -247,47 +268,64 @@ EOF
 
 
       /bin/rm -f g_src.nc
+
+      $ncobdir/ncks -h -A $d g_dst.nc
+
       
       #landfrac is conservtive now, get the grid_area, landmask in the destination SCRIP grid
 cat <<EOF >./tmp3.nco
-   grid_area=landfrac*area;
-   landmask=int(grid_area)*0;
-   where(grid_area>0) landmask=1;
-   elsewhere          landmask=0;
+   grid_area=grid_center_lat*0.0;
+   grid_lndf=grid_center_lat*0.0;
+   grid_area=area;
+   grid_lndf=landfrac;
+   grid_area=grid_area*grid_lndf;
+   grid_imask=int(grid_center_lat)*0;
+   where(grid_area>0) grid_imask=1;
+   elsewhere          grid_imask=0;
 EOF
       $ncapbin -O -S tmp3.nco g_dst.nc z.nc
       /bin/rm -f tmp3.nco
-      $ncobdir/ncks -O -v grid_area z.nc y.nc
+      $ncobdir/ncks -O -v grid_area,grid_imask z.nc y.nc
       $ncobdir/ncatted -a units,grid_area,o,c,'radians^2' y.nc
       $ncobdir/ncatted -a long_name,grid_area,o,c,'area weights' y.nc
-      
-cat <<EOF >./tmp4.nco
-    grid_area=grid_center_lat*0.0; 
-EOF
-      $ncapbin -O -S tmp4.nco $d $dm
 
-      /bin/rm -f tmp4.nco
+      #put the grid_area and grid_imask data into the source SCRIP grid file for ncremap
+      $ncobdir/ncks -O -x -v grid_area,grid_imask $d $dm
+      $ncobdir/ncks -A -v grid_area,grid_imask y.nc $dm
 
-      # I used the ncl to reshape the dimensions of the grid_area and grid_imask variables, 
-      # I do not know how to do it using NCO.
-      /bin/rm -f tmp1.ncl
-cat <<EOF >./tmp1.ncl
-begin
-   f = addfile(sgrd, "r")
-   g = addfile(dgrd, "w")
-   dims = dimsizes(f->grid_area)
-   size = 1
-   do i = 0, dimsizes(dims) - 1
-      size = size * dims(i)
-   end do
-   g->grid_area = reshape(f->grid_area,size)
-   g->grid_imask = where(reshape(f->grid_area,size) .gt. 0, 1, 0)
-   delete(f)
-   delete(g)
-end
-EOF
-      ncl tmp1.ncl sgrd=\"y.nc\" dgrd=\"$dm\"
+      echo $dm, 'xxxx'
+
       /bin/rm -f y.nc
+      
+#-cat <<EOF >./tmp4.nco
+#-    grid_area=grid_center_lat*0.0; 
+#-EOF
+#-      $ncapbin -O -S tmp4.nco $d $dm
+#-
+#-      /bin/rm -f tmp4.nco
+#-
+#-      # I used the ncl to reshape the dimensions of the grid_area and grid_imask variables, 
+#-      # I do not know how to do it using NCO.
+#-      /bin/rm -f tmp1.ncl
+#-cat <<EOF >./tmp1.ncl
+#-begin
+#-   f = addfile(sgrd, "r")
+#-   g = addfile(dgrd, "w")
+#-   dims = dimsizes(f->grid_area)
+#-   size = 1
+#-   do i = 0, dimsizes(dims) - 1
+#-      size = size * dims(i)
+#-   end do
+#-   g->grid_area = reshape(f->grid_area,size)
+#-   g->grid_imask = where(reshape(f->grid_area,size) .gt. 0, 1, 0)
+#-   delete(f)
+#-   delete(g)
+#-end
+#-EOF
+#-      ncl tmp1.ncl sgrd=\"y.nc\" dgrd=\"$dm\"
+#-      /bin/rm -f y.nc
+
+
    fi   # finish generating the masked destination grid description file
 
    #do ncremap again, but using land area instead of grid area
@@ -313,6 +351,7 @@ EOF
           $ncobdir/ncremap -i xxx.nc -o test.nc -m map.nc
        fi
        /bin/rm -f xxx.nc
+       echo 'xxxx'
    fi
 
    $ncobdir/ncks -O -x -v area,landmask,landfrac test.nc $dst_dir/$fo
